@@ -1,0 +1,8 @@
+#+TITLE: A Rust Image Processing Playground
+#+OPTIONS: ':nil
+
+* cv-rs is a personal project for exploring image processing in Rust. It’s a place to learn by doing.
+
+* Philosophy
+- Minimal dependencies
+- Focused on clarity, experimentation, and learning
