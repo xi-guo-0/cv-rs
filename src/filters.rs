@@ -69,6 +69,42 @@ fn resize_nearest_cpu(img: &Image, new_width: usize, new_height: usize) -> Image
     }
 }
 
+pub fn sobel_edge_detection(img: &Image) -> Image {
+    let (width, height, data) = match img {
+        Image::Gray {
+            width,
+            height,
+            data,
+        } => (*width, *height, data),
+        _ => panic!("Sobel only implemented for grayscale images"),
+    };
+    let gx = [-1.0, 0.0, 1.0, -2.0, 0.0, 2.0, -1.0, 0.0, 1.0];
+    let gy = [-1.0, -2.0, -1.0, 0.0, 0.0, 0.0, 1.0, 2.0, 1.0];
+    let mut out = vec![0u8; width * height];
+
+    for y in 0..height {
+        for x in 0..width {
+            let mut sx = 0.0;
+            let mut sy = 0.0;
+            for ky in 0..3 {
+                for kx in 0..3 {
+                    let ix = x as isize + kx as isize - 1;
+                    let iy = y as isize + ky as isize - 1;
+                    if 0 <= ix && ix < width as isize && 0 <= iy && iy < height as isize {
+                        let idx = iy as usize * width + ix as usize;
+                        sx += data[idx] as f32 * gx[ky * 3 + kx];
+                        sy += data[idx] as f32 * gy[ky * 3 + kx];
+                    }
+                }
+            }
+            let mag = sx.abs() + sy.abs();
+            out[y * width + x] = mag.min(255.0) as u8;
+        }
+    }
+
+    Image::gray(width, height, out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,5 +144,17 @@ mod tests {
     fn test_resize_gpu_unimplemented() {
         let img = Image::gray(2, 2, vec![10, 20, 30, 40]);
         let _ = resize(&img, 4, 4, ResizeBackend::Gpu, ResizeAlgorithm::Nearest);
+    }
+
+    #[test]
+    fn test_sobel_edge_detection_on_simple_image() {
+        let input = Image::gray(3, 3, vec![0, 0, 0, 0, 255, 255, 0, 0, 0]);
+        let output = sobel_edge_detection(&input);
+
+        if let Image::Gray { data, .. } = output {
+            assert!(data[4] > 200, "Center pixel expected to have strong edge");
+        } else {
+            assert!(false, "Output image is not grayscale");
+        }
     }
 }
