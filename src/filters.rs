@@ -1,3 +1,5 @@
+use core::panic;
+
 use crate::image::Image;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -105,6 +107,23 @@ pub fn sobel_edge_detection(img: &Image) -> Image {
     Image::gray(width, height, out)
 }
 
+pub fn threshold_binary(img: &Image, thresh: u8, maxval: u8) -> Image {
+    match img {
+        Image::Gray {
+            width,
+            height,
+            data,
+        } => {
+            let mut out = Vec::with_capacity(data.len());
+            for &v in data.iter() {
+                out.push(if v > thresh { maxval } else { 0 });
+            }
+            Image::gray(*width, *height, out)
+        }
+        _ => panic!("Binary threshold only for grayscale images"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,5 +175,12 @@ mod tests {
         } else {
             assert!(false, "Output image is not grayscale");
         }
+    }
+
+    #[test]
+    fn test_threshold_binary() {
+        let img = Image::gray(2, 2, vec![10, 200, 30, 250]);
+        let out = threshold_binary(&img, 100, 255);
+        assert_eq!(out.data(), &vec![0, 255, 0, 255]);
     }
 }
