@@ -124,6 +124,53 @@ pub fn threshold_binary(img: &Image, thresh: u8, maxval: u8) -> Image {
     }
 }
 
+fn convolve_1d(img: &Image, kernel: &[f32], horizontal: bool) -> Image {
+    match img {
+        Image::Gray {
+            width,
+            height,
+            data,
+        } => {
+            let mut out = vec![0u8; width * height];
+            let k = kernel.len() as isize / 2;
+            for y in 0..*height {
+                for x in 0..*width {
+                    let mut acc = 0.0;
+                    for i in 0..kernel.len() {
+                        let (ix, iy) = if horizontal {
+                            (x as isize + i as isize - k, y as isize)
+                        } else {
+                            (x as isize, y as isize + i as isize - k)
+                        };
+                        if ix >= 0 && iy >= 0 && ix < *width as isize && iy < *height as isize {
+                            acc += data[iy as usize * *width + ix as usize] as f32 * kernel[i];
+                        }
+                    }
+                    out[y * *width + x] = acc.clamp(0.0, 255.0) as u8;
+                }
+            }
+            Image::gray(*width, *height, out)
+        }
+        _ => panic!("Only grayscale supported for gaussian_blur for now"),
+    }
+}
+
+pub fn gaussian_blur(img: &Image, ksize: usize, sigma: f32) -> Image {
+    let mut kernel = Vec::with_capacity(ksize);
+    let k = ksize as isize / 2;
+    let mut sum = 0.0;
+    for i in -k..=k {
+        let v = (-((i * i) as f32) / (2.0 * sigma * sigma)).exp();
+        kernel.push(v);
+        sum += v;
+    }
+    for v in kernel.iter_mut() {
+        *v /= sum;
+    }
+    let tmp = convolve_1d(img, &kernel, true);
+    convolve_1d(&tmp, &kernel, false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,5 +229,12 @@ mod tests {
         let img = Image::gray(2, 2, vec![10, 200, 30, 250]);
         let out = threshold_binary(&img, 100, 255);
         assert_eq!(out.data(), &vec![0, 255, 0, 255]);
+    }
+
+    #[test]
+    fn test_gaussian_blur() {
+        let img = Image::gray(3, 1, vec![0, 255, 0]);
+        let out = gaussian_blur(&img, 3, 1.0);
+        assert_eq!(out.width(), 3);
     }
 }
